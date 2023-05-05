@@ -4,7 +4,8 @@
 using namespace std;
 
 // 普通高斯消去，LU分解
-void LU(vector<vector<double>>& A, int N) {
+void LU(float** A, int N) {
+    // cout << "start LU" << endl;
     for (int k=0; k<N; k++) {
         for (int j=k+1; j<N; j++) {
             A[k][j] = A[k][j] / A[k][k];
@@ -16,6 +17,8 @@ void LU(vector<vector<double>>& A, int N) {
             }
             A[i][k] = 0;
         }
+        // print(A, N);
+        // cout << endl;
     }
 }
 
@@ -26,26 +29,21 @@ int main() {
         // 设置问题规模
         N = size[i];
 
-        // 使用MatrixXd产生随机可逆矩阵
-        MatrixXd A = generate_invertible_matrix(N);
-
-        // MatrixXd转为二维数组
-        vector<vector<double>> A_vec(N, vector<double>(N));
-        for (int i=0; i<A.rows(); i++) {
-            for (int i=0; i<A.rows(); i++) {
-                for (int j=0; j<A.cols(); j++) {
-                    A_vec[i][j] = A(i, j);
-                }
-            }
+        // 初始化二维数组
+        float** A = new float*[N];
+        for (int i=0; i<N; i++) {
+            A[i] = new float[N];
         }
+        reset(A, N);
+        // print(A, N);
 
         // 使用C++11的chrono库来计时
         auto start = chrono::high_resolution_clock::now();
-        LU(A_vec, N);
+        LU(A, N);
         auto end = chrono::high_resolution_clock::now();
         auto diff = chrono::duration_cast<chrono::duration<double, milli>>(end - start);
         cout << "Size = " << N << ": " << diff.count() << "ms" << endl;
-        // print(A_vec, N);
+        // print(A, N);
         // break;
     }
     return 0;

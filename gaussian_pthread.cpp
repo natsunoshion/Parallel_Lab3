@@ -99,12 +99,7 @@ int main() {
         auto end = chrono::high_resolution_clock::now();
         auto diff = chrono::duration_cast<chrono::duration<double, milli>>(end - start);
         cout << "Size = " << N << ": " << diff.count() << "ms" << endl;
-        // for (int i=0; i<N; i++) {
-        //     for (int j=0; j<N; j++) {
-        //         cout << A[i][j] << ' ';
-        //     }
-        //     cout << endl;
-        // }
+        // print(A, N);
         // break;
     }
     return 0;
