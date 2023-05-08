@@ -49,6 +49,18 @@ void solve() {
     }
 }
 
+void print() {
+    for (int i=0; i<m; i++) {
+        // cout << i << ':';
+        for (int j=arg1-1; j>=0; j--) {
+            if (E[i][j] == 1) {
+                cout << j << ' ';
+            }
+        }
+        cout << endl;
+    }
+}
+
 int main() {
     // 读入消元子
     ifstream file_R;
@@ -104,14 +116,6 @@ int main() {
     cout << diff.count() << "ms" << endl;
 //--------------------------------
     // 验证结果正确性
-    for (int i=0; i<m; i++) {
-        // cout << i << ':';
-        for (int j=arg1-1; j>=0; j--) {
-            if (E[i][j] == 1) {
-                cout << j << ' ';
-            }
-        }
-        cout << endl;
-    }
+    // print();
     return 0;
 }

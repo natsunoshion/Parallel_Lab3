@@ -3,48 +3,58 @@
 
 using namespace std;
 
+// 都放静态存储区，节省内存
+float** A;
+int n;
+
 // 普通高斯消去，LU分解
-void LU(float** A, int N) {
+void LU() {
     // cout << "start LU" << endl;
-    for (int k=0; k<N; k++) {
-        for (int j=k+1; j<N; j++) {
+    for (int k=0; k<n; k++) {
+        for (int j=k+1; j<n; j++) {
             A[k][j] = A[k][j] / A[k][k];
         }
         A[k][k] = 1.0;
-        for (int i=k+1; i<N; i++) {
-            for (int j=k+1; j<N; j++) {
+        for (int i=k+1; i<n; i++) {
+            for (int j=k+1; j<n; j++) {
                 A[i][j] = A[i][j] - A[k][j]*A[i][k];
             }
             A[i][k] = 0;
         }
-        // print(A, N);
+        // print(A, n);
         // cout << endl;
     }
 }
 
 int main() {
-    int N;
     vector<int> size = {200, 500, 1000, 2000, 3000};
     for (int i=0; i<5; i++) {
         // 设置问题规模
-        N = size[i];
+        n = size[i];
 
         // 初始化二维数组
-        float** A = new float*[N];
-        for (int i=0; i<N; i++) {
-            A[i] = new float[N];
+        A = new float*[n];
+        for (int i=0; i<n; i++) {
+            A[i] = new float[n];
         }
-        reset(A, N);
-        // print(A, N);
+        reset(A, n);
+        // print(A, n);
 
         // 使用C++11的chrono库来计时
         auto start = chrono::high_resolution_clock::now();
-        LU(A, N);
+        LU();
         auto end = chrono::high_resolution_clock::now();
         auto diff = chrono::duration_cast<chrono::duration<double, milli>>(end - start);
-        cout << "Size = " << N << ": " << diff.count() << "ms" << endl;
-        // print(A, N);
+        cout << "Size = " << n << ": " << diff.count() << "ms" << endl;
+        
+        // print(A, n);
         // break;
+        
+        // 释放二维数组A的空间
+        for (int i = 0; i < n; i++) {
+            delete[] A[i];
+        }
+        delete[] A;
     }
     return 0;
 }
