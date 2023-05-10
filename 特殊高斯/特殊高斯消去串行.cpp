@@ -2,25 +2,20 @@
 
 using namespace std;
 
-#define arg1 254
-#define arg2 106
-#define arg3 53
-
-// MAXM:最大行数，MAXN：列数
-const int MAXM = 10000;  // 不影响性能
-const int MAXN = arg1;
+// 对应于数据集三个参数：矩阵列数，非零消元子行数，被消元行行数
+#define num_columns 254
+#define num_elimination_rows 106
+#define num_eliminated_rows 53
 
 // 使用bitset进行存储，R：消元子，E：被消元行
-bitset<MAXN> R[MAXM];
-bitset<MAXN> E[MAXM];
-
-// 被消元行行数
-int m = arg3;
+bitset<num_columns> R[10000];  // R[i]记录了首项为i（下标从0开始记录）的消元子行
+                               // 所以不能直接用num_elimination_rows设置数组大小
+bitset<num_columns> E[num_eliminated_rows];
 
 // 特殊高斯消去法串行实现
 void solve() {
     // 循环处理每个被消元行
-    for (int i = 0; i < m; i++) {
+    for (int i = 0; i < num_eliminated_rows; i++) {
         // 如果当前被消元行为零，则直接跳过
         if (E[i].none()) {
             continue;
@@ -29,7 +24,7 @@ void solve() {
         // 循环处理当前被消元行的每一项
         while (!E[i].none()) {
             // 找到当前被消元行的首项
-            int k = MAXN - 1;
+            int k = num_columns - 1;
             while (E[i][k]==0 && k>=0) {
                 k--;
             }
@@ -39,6 +34,7 @@ void solve() {
             if (!R[k].any()) {
                 R[k] = E[i];
                 // E[i].reset();
+                // cout << "升格";
                 break;
             }
             // 如果首项对应的消元子存在，则进行消去操作
@@ -50,9 +46,9 @@ void solve() {
 }
 
 void print() {
-    for (int i=0; i<m; i++) {
+    for (int i=0; i<num_eliminated_rows; i++) {
         // cout << i << ':';
-        for (int j=arg1-1; j>=0; j--) {
+        for (int j=num_columns-1; j>=0; j--) {
             if (E[i][j] == 1) {
                 cout << j << ' ';
             }
@@ -68,7 +64,7 @@ int main() {
     // file_R.open("/home/data/Groebner/测试样例1 矩阵列数130，非零消元子22，被消元行8/消元子.txt");
     file_R.open("R.txt");
     if (file_R.fail()) {
-        cout << "wow" << endl;
+        cout << "读入失败" << endl;
     }
     while (file_R.getline(buffer, sizeof(buffer))) {
         // 每一次读入一行，消元子每32位记录进一个int中

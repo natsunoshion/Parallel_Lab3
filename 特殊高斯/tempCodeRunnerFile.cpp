@@ -1,0 +1,1 @@
+num_elimination_rows
