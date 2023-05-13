@@ -1,3 +1,9 @@
+/*
+使用int整数数组实现位图
+5个bit组成一个int
+基本就只能分析代码调试，非常阴间
+*/
+
 #include <bits/stdc++.h>
 
 using namespace std;
@@ -7,53 +13,68 @@ using namespace std;
 #define num_elimination_rows 106
 #define num_eliminated_rows 53
 
-// 使用bitset进行存储，R：消元子，E：被消元行
-bitset<num_columns> R[10000];  // R[i]记录了首项为i（下标从0开始记录）的消元子行
-                               // 所以不能直接用num_elimination_rows设置数组大小
-bitset<num_columns> E[num_eliminated_rows];
+// 数组长度
+const int length = ceil(num_columns / 5.0);
 
-// 特殊高斯消去法串行实现
-void solve() {
-    // 循环处理每个被消元行
-    for (int i = 0; i < num_eliminated_rows; i++) {
-        // 如果当前被消元行为零，则直接跳过
-        if (E[i].none()) {
-            continue;
-        }
+// 使用int数组进行存储，R：消元子，E：被消元行
+int R[10000][length];  // R[i]记录了首项为i（下标从0开始记录）的消元子行
+                       // 所以不能直接用num_elimination_rows设置数组大小
+int E[num_eliminated_rows][length];
 
-        // 循环处理当前被消元行的每一项
-        while (!E[i].none()) {
-            // 找到当前被消元行的首项
-            int k = num_columns - 1;
-            while (E[i][k]==0 && k>=0) {
-                k--;
-            }
-            // cout << "首项" << k;
+// 记录是否升格
+bool lifted[num_eliminated_rows];
 
-            // 如果首项对应的消元子不存在，则进行“升格”，将当前行加入该消元子的集合中
-            if (!R[k].any()) {
-                R[k] = E[i];
-                // E[i].reset();
-                // cout << "升格";
-                break;
-            }
-            // 如果首项对应的消元子存在，则进行消去操作
-            else {
-                E[i] ^= R[k];
-            }
-        }
-    }
-}
-
+// 将当前位图打印到屏幕上
 void print() {
     for (int i=0; i<num_eliminated_rows; i++) {
         // cout << i << ':';
         for (int j=num_columns-1; j>=0; j--) {
-            if (E[i][j] == 1) {
+            // 第j位为1
+            if (((E[i][j / 5] >> (j - 5*(j/5)))) & 1 == 1) {
                 cout << j << ' ';
             }
         }
+        // for (int j=length-1; j>=0; j--) {
+        //     cout << E[i][j] << ' ';
+        // }
         cout << endl;
+    }
+}
+
+// 特殊高斯消去法串行int数组实现
+void solve() {
+    // 遍历被消元行：逐元素消去，一次清空
+    for (int i = 0; i < num_eliminated_rows; i++) {
+        bool is_eliminated = false;
+        // 行内遍历依次找首项消去
+        for (int j = length - 1; j >= 0; j--) {
+            // cout << j << "消去" << endl;
+            for (int k=4; k>=0; k--) {
+                if ((E[i][j] >> k) == 1) {
+                    // 获得首项
+                    int leader = 5 * j + k;
+                    if (R[leader][j] != 0) {
+                        // 有消元子就消去，需要对整行异或
+                        for (int m=j; m>=0; m--) {
+                            E[i][m] ^= R[leader][m];
+                        }
+                    } else {
+                        // 否则升格，升格之后这一整行都可以不用管了
+                        for (int m=j; m>=0; m--) {
+                            R[leader][m] = E[i][m];
+                        }
+                        // 跳出多重循环
+                        is_eliminated = true;
+                    }
+                }
+                if (is_eliminated) {
+                    break;
+                }
+            }
+            if (is_eliminated) {
+                break;
+            }
+        }
     }
 }
 
@@ -72,7 +93,7 @@ int main() {
         stringstream line(buffer);
         int first_in = 1;
 
-        // 消元子的索引是其首项
+        // 消元子的index是其首项
         int index;
         while (line >> bit) {
             if (first_in) {
@@ -80,8 +101,8 @@ int main() {
                 index = bit;
             }
 
-            // 将第index行的消元子bitset对应位 置1
-            R[index][bit] = 1;
+            // 将第index行的消元子对应位 置1
+            R[index][bit / 5] |= 1 << (bit - (bit / 5) * 5);
         }
     }
     file_R.close();
@@ -91,18 +112,20 @@ int main() {
     // file_E.open("/home/data/Groebner/测试样例1 矩阵列数130，非零消元子22，被消元行8/被消元行.txt");
     file_E.open("E.txt");
 
-    // 被消元行的索引就是读入的行数
+    // 被消元行的index就是读入的行数
     int index = 0;
     while (file_E.getline(buffer, sizeof(buffer))) {
         // 每一次读入一行，消元子每32位记录进一个int中
         int bit;
         stringstream line(buffer);
         while (line >> bit) {
-            // 将第index行的消元子bitset对应位 置1
-            E[index][bit] = 1;
+            // 将第index行的被消元行对应位 置1
+            E[index][bit / 5] |= (1 << (bit - (bit / 5) * 5));
         }
         index++;
     }
+    // cout << E[6][50];
+    // print();
 //--------------------------------
     // 使用C++11的chrono库来计时
     auto start = chrono::high_resolution_clock::now();
@@ -112,6 +135,6 @@ int main() {
     cout << diff.count() << "ms" << endl;
 //--------------------------------
     // 验证结果正确性
-    // print();
+    print();
     return 0;
 }
