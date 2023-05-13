@@ -1,6 +1,7 @@
 #include <bits/stdc++.h>
 #include "random.h"
 #include <pthread.h>  // Pthread编程
+#include <arm_neon.h>
 
 using namespace std;
 
@@ -23,7 +24,21 @@ void* thread_func(void* arg) {
 
     // 一个线程负责一行
     int i = k + id + 1;
-    for (int j=k; j<n; j++) {
+    // 创建向量
+    float32x4_t vx, vaij, vaik, vakj;
+    vaik = vld1q_dup_f32(&A[i][k]);
+    int j;
+    // j: k ~ n-1，向量化
+    for (j=k; j+4<=n; j+=4) {
+        // A[i][j] -= A[i][k] * A[k][j];
+        vakj = vld1q_f32(&A[k][j]);
+        vaij = vld1q_f32(&A[i][j]);
+        vx = vmulq_f32(vakj, vaik);
+        vaij = vsubq_f32(vaij, vx);
+        vst1q_f32(&A[i][j], vaij);
+    }
+    // 不能整除的部分
+    for (; j<n; j++) {
         A[i][j] -= A[i][k] * A[k][j];
     }
     pthread_exit(NULL);

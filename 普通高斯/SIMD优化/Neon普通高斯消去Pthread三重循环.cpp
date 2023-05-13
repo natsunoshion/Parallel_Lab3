@@ -1,7 +1,8 @@
 #include <bits/stdc++.h>
 #include "random.h"
 #include <pthread.h>  // Pthread编程
-#include <arm_neon.h>  // Neon实现SIMD
+#include <semaphore.h>  // 使用信号量
+#include <arm_neon.h>
 
 using namespace std;
 
@@ -11,8 +12,10 @@ using namespace std;
 float** A;
 int n;
 
-// barrier同步
-pthread_barrier_t barrier;
+// 信号量,同步除法与消去
+sem_t sem_leader;
+sem_t sem_division[NUM_THREADS - 1];
+sem_t sem_elimination[NUM_THREADS - 1];
 
 // 用于线程函数传参：线程号id
 // 由于只创建一次线程，所以不需要记录当前行k，而是一个类似主线程与工作线程“轮流”运算的操作，两边的循环变量k是一起变的
@@ -21,32 +24,39 @@ typedef struct {
 } ThreadArgs;
 
 // 并行函数
+// 三重循环全部放在线程函数中
 // 每个线程都拥有一个这个函数，只是id不同，所需要处理的部分就不同了
-// barrier同步需要把除法和减法都写在线程函数中
 void* thread_func(void* arg) {
     // 在循环外创建向量
-    float32x4_t vx = vmovq_n_f32(0);
-    float32x4_t vaij = vmovq_n_f32(0);
-    float32x4_t vaik = vmovq_n_f32(0);
-    float32x4_t vakj = vmovq_n_f32(0);
+    float32x4_t vx, vaij, vaik, vakj;
     // 传参
     ThreadArgs* thread_arg = (ThreadArgs*)arg;
     int id = thread_arg->id;
 
     for (int k=0; k<n; k++) {
-        // 串行除法，这里也会顺带并行化
-        for (int i = k+id; i<n; i += NUM_THREADS) {
-            A[k][i] /= A[k][k];
+        // id为0的线程进行除法操作
+        if (id == 0) {
+            for (int j=k+1; j<n; j++) {
+                A[k][j] /= A[k][k];
+            }
+            A[k][k] = 1.0;
+            // 除法完成,唤醒其他线程
+            for (int i=0; i<NUM_THREADS-1; i++) {
+                sem_post(&sem_division[i]);
+            }
+        } else {
+            // 其余线程先等待
+            sem_wait(&sem_division[id - 1]);
         }
-        // 第一次同步：除法同步
-        pthread_barrier_wait(&barrier);
+
         // 消去第[k+1, n)行的第k列元素
         // 按行间隔划分，交给NUM_THREADS个线程来处理
+        // 第0号线程也会参与,提升线程利用率
         for (int i = k+1+id; i<n; i += NUM_THREADS) {
-            vaik = vmovq_n_f32(&(A[i][k]);
+            vaik = vld1q_dup_f32(&A[i][k]);
             int j;
             // j: k ~ n-1，向量化
-            for (j=k; j<n; j+=4) {
+            for (j=k; j+4<=n; j+=4) {
                 // A[i][j] -= A[i][k] * A[k][j];
                 vakj = vld1q_f32(&A[k][j]);
                 vaij = vld1q_f32(&A[i][j]);
@@ -59,8 +69,22 @@ void* thread_func(void* arg) {
                 A[i][j] -= A[i][k] * A[k][j];
             }
         }
-        // 第二次同步：减法同步
-        pthread_barrier_wait(&barrier);
+        // 以0号线程为基准同步
+        if (id == 0) {
+            // 等待其余工作线程结束消去操作
+            for (int i=0; i<NUM_THREADS-1; i++) {
+                sem_wait(&sem_leader);
+            }
+            // 通知消去完成
+            for (int i=0; i<NUM_THREADS-1; i++) {
+                sem_post(&sem_elimination[i]);
+            }
+        } else {
+            // 通知leader
+            sem_post(&sem_leader);
+            // 等待0号线程的通知
+            sem_wait(&sem_elimination[id - 1]);
+        }
     }
     pthread_exit(NULL);
 }
@@ -70,13 +94,19 @@ void LU() {
     pthread_t threads[NUM_THREADS];
     ThreadArgs thread_ids[NUM_THREADS];
 
-    // barrier初始化，用于同步线程
-    pthread_barrier_init(&barrier, NULL, NUM_THREADS);
-
     // 初始化线程的id
     for (int i=0; i<NUM_THREADS; i++) {
         thread_ids[i] = {i};
     }
+
+    // 初始化信号量，这很重要
+    sem_init(&sem_leader, 0, 0);
+    for (int i=0; i<NUM_THREADS-1; i++) {
+        sem_init(&sem_division[i], 0, 0);
+        sem_init(&sem_elimination[i], 0, 0);
+    }
+
+    // 创建线程
     for (int i=0; i<NUM_THREADS; i++) {
         pthread_create(&threads[i], NULL, thread_func, &thread_ids[i]);
     }
@@ -85,8 +115,6 @@ void LU() {
     for (int i=0; i<NUM_THREADS; i++) {
         pthread_join(threads[i], NULL);
     }
-    // 销毁barrier
-    pthread_barrier_destroy(&barrier);
 }
 
 int main() {

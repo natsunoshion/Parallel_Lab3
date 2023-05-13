@@ -41,40 +41,67 @@ void print() {
     }
 }
 
-// 特殊高斯消去法串行int数组实现
+// 特殊高斯消去法并行OpenMP实现，假设每一轮取5列消元子/被消元行出来
 void solve() {
-    // 遍历被消元行：逐元素消去，一次清空
-    for (int i = 0; i < num_eliminated_rows; i++) {
-        bool is_eliminated = false;
-        // 行内遍历依次找首项消去
-        for (int j = length - 1; j >= 0; j--) {
-            // cout << j << "消去" << endl;
-            for (int k=4; k>=0; k--) {
-                if ((E[i][j] >> k) == 1) {
-                    // 获得首项
-                    int leader = 5 * j + k;
-                    if (R[leader][j] != 0) {
-                        // 有消元子就消去，需要对整行异或
-                        for (int m=j; m>=0; m--) {
-                            E[i][m] ^= R[leader][m];
-                        }
+    // cout << "in";
+    int n;
+    // 每一次遍历消元子、被消元行的5个bit，通过数组的一个元素来实现
+    // E[i][x]对应了5x ~ 5(x+1)-1这5个bit，从右向左存储bit
+    // 这样存储的好处：不用考虑边界
+    for (n = length - 1; n >= 0; n--) {
+        // 遍历被消元行
+        vector<pair<int, int>> records;  // 记录 <消元行操作的行号，首项所在的列号>
+        for (int i=0; i<num_eliminated_rows; i++) {
+            // 不处理升格的那些行
+            if (lifted[i]) {
+                continue;
+            }
+            // 找首项消去，必须从高到低找
+            for (int j = 5*(n+1)-1; j >= 5*n; j--) {
+                if (E[i][n] >> (j-5*n) == 1) {\
+                    if (R[j][n] != 0) {
+                        E[i][n] ^= R[j][n];
+                        records.emplace_back(i, j);
                     } else {
-                        // 否则升格，升格之后这一整行都可以不用管了
-                        for (int m=j; m>=0; m--) {
-                            R[leader][m] = E[i][m];
+                        // 立刻升格，方便之后其他行消去
+                        for (auto pair : records) {
+                            int row = pair.first;
+                            int leader = pair.second;
+                            if (row == i) {
+                                // 补上剩下位的异或
+                                for (int k=n-1; k>=0; k--) {
+                                    E[i][k] ^= R[leader][k];
+                                }
+                            }
                         }
-                        // 跳出多重循环
-                        is_eliminated = true;
+                        // 消元子第j行 = 被消元行第i行
+                        for (int k=0; k<length; k++) {
+                            R[j][k] = E[i][k];
+                        }
+                        lifted[i] = true;
+                        break;
                     }
                 }
-                if (is_eliminated) {
-                    break;
-                }
-            }
-            if (is_eliminated) {
-                break;
             }
         }
+        // 接下来，对剩下的列进行并行计算，按照records中的记录进行多线程操作（由于刚刚没有存回去，所以这里剩下有n列）
+        // 这些数组元素就按照记录挨个异或，由于已经有记录了（无依赖），所以可以并行化
+        // OpenMP多线程并行化
+        #pragma omp parallel for simd schedule(guided, 1)
+        for (int m=n-1; m>=0; m--) {
+            for (auto pair : records) {
+                int row = pair.first;
+                int leader = pair.second;
+                // 跳过已经升格的行
+                if (lifted[row]) {
+                    continue;
+                }
+                E[row][m] ^= R[leader][m];
+            }
+        }
+        // cout << "调试开始" << endl;
+        // cout << "n=" << n << endl;
+        // print();
     }
 }
 
@@ -135,6 +162,6 @@ int main() {
     cout << diff.count() << "ms" << endl;
 //--------------------------------
     // 验证结果正确性
-    print();
+    // print();
     return 0;
 }

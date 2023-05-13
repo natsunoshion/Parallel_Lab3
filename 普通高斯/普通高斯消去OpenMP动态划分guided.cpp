@@ -1,5 +1,6 @@
 #include <bits/stdc++.h>  // 使用万能头文件stdc++.h，注意，有的IDE可能不支持
 #include "random.h"  // 使用自制的随机库
+#include <omp.h>
 
 using namespace std;
 

@@ -1,5 +1,5 @@
 /*
-使用int整数数组实现位图
+使用char整数数组实现位图
 5个bit组成一个int
 基本就只能分析代码调试，非常阴间
 */
@@ -16,10 +16,10 @@ using namespace std;
 // 数组长度
 const int length = ceil(num_columns / 5.0);
 
-// 使用int数组进行存储，R：消元子，E：被消元行
-int R[10000][length];  // R[i]记录了首项为i（下标从0开始记录）的消元子行
-                       // 所以不能直接用num_elimination_rows设置数组大小
-int E[num_eliminated_rows][length];
+// 使用char数组进行存储，R：消元子，E：被消元行
+char R[10000][length];  // R[i]记录了首项为i（下标从0开始记录）的消元子行
+                        // 所以不能直接用num_elimination_rows设置数组大小
+char E[num_eliminated_rows][length];
 
 // 记录是否升格
 bool lifted[num_eliminated_rows];
@@ -84,7 +84,7 @@ void solve() {
                 }
             }
         }
-        // 接下来，对后n-4列进行并行计算，按照records中的记录进行多线程操作（由于刚刚没有存回去，所以这里剩下有n列）
+        // 接下来，对剩下的列进行并行计算，按照records中的记录进行多线程操作（由于刚刚没有存回去，所以这里剩下有n列）
         // 这些数组元素就按照记录挨个异或，由于已经有记录了（无依赖），所以可以并行化
         // OpenMP多线程并行化
         #pragma omp parallel for simd schedule(guided, 1)

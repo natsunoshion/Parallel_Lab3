@@ -1,6 +1,7 @@
 #include <bits/stdc++.h>
 #include "random.h"
 #include <pthread.h>  // Pthread编程
+#include <arm_neon.h>  // Neon实现SIMD
 
 using namespace std;
 
@@ -23,6 +24,8 @@ typedef struct {
 // 每个线程都拥有一个这个函数，只是id不同，所需要处理的部分就不同了
 // barrier同步需要把除法和减法都写在线程函数中
 void* thread_func(void* arg) {
+    // 在循环外创建向量
+    float32x4_t vx, vaij, vaik, vakj;
     // 传参
     ThreadArgs* thread_arg = (ThreadArgs*)arg;
     int id = thread_arg->id;
@@ -37,7 +40,19 @@ void* thread_func(void* arg) {
         // 消去第[k+1, n)行的第k列元素
         // 按行间隔划分，交给NUM_THREADS个线程来处理
         for (int i = k+1+id; i<n; i += NUM_THREADS) {
-            for (int j=k; j<n; j++) {
+            vaik = vld1q_dup_f32(&A[i][k]);
+            int j;
+            // j: k ~ n-1，向量化
+            for (j=k; j+4<=n; j+=4) {
+                // A[i][j] -= A[i][k] * A[k][j];
+                vakj = vld1q_f32(&A[k][j]);
+                vaij = vld1q_f32(&A[i][j]);
+                vx = vmulq_f32(vakj, vaik);
+                vaij = vsubq_f32(vaij, vx);
+                vst1q_f32(&A[i][j], vaij);
+            }
+            // 不能整除的部分
+            for (; j<n; j++) {
                 A[i][j] -= A[i][k] * A[k][j];
             }
         }

@@ -26,7 +26,7 @@ void print(float** m, int n) {
 }
 
 // 重新产生随机数矩阵
-// 采用先产生上三角矩阵，然后不同行之间线性组合的策略，保证矩阵满秩
+// 尝试过几天，事实上全部random才是最佳选择
 void reset(float** m, int n) {
     // // 先产生一个上三角矩阵
     // for (int i=0; i<n; i++) {

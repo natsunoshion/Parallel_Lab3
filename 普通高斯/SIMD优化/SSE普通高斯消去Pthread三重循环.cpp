@@ -2,6 +2,7 @@
 #include "random.h"
 #include <pthread.h>  // Pthread编程
 #include <semaphore.h>  // 使用信号量
+#include <nmmintrin.h>
 
 using namespace std;
 
@@ -26,6 +27,8 @@ typedef struct {
 // 三重循环全部放在线程函数中
 // 每个线程都拥有一个这个函数，只是id不同，所需要处理的部分就不同了
 void* thread_func(void* arg) {
+    // 在循环外创建向量
+    __m128 vx, vaij, vaik, vakj;
     // 传参
     ThreadArgs* thread_arg = (ThreadArgs*)arg;
     int id = thread_arg->id;
@@ -50,8 +53,23 @@ void* thread_func(void* arg) {
         // 按行间隔划分，交给NUM_THREADS个线程来处理
         // 第0号线程也会参与,提升线程利用率
         for (int i = k+1+id; i<n; i += NUM_THREADS) {
-            for (int j=k+1; j<n; j++) {
-                A[i][j] -= A[i][k] * A[k][j];
+            // 对第i行的元素计算进行并行化处理
+            // A[i][j]、A[k][j]开始连续四个元素分别形成寄存器
+            // A[i][k]为固定值，复制4份存在另一个寄存器里
+            vaik = _mm_load1_ps(&A[i][k]);
+            int j;
+            for (j=k+1; j+4<=n; j+=4) {
+                // 原始公式：A[i][j] = A[i][j] - A[k][j]*A[i][k];
+                vakj = _mm_loadu_ps(&A[k][j]);
+                vaij = _mm_loadu_ps(&A[i][j]);
+                vx = _mm_mul_ps(vakj, vaik);
+                vaij = _mm_sub_ps(vaij, vx);
+                _mm_storeu_ps(&A[i][j], vaij);
+            }
+
+            // 剩下的元素
+            for (; j<n; j++) {
+                A[i][j] = A[i][j] - A[k][j]*A[i][k];
             }
             A[i][k] = 0;
         }

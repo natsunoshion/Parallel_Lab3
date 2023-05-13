@@ -1,11 +1,9 @@
 #include <bits/stdc++.h>
 #include "random.h"
 #include <pthread.h>  // Pthread编程
-#include <arm_neon.h>
+#include <nmmintrin.h>
 
 using namespace std;
-
-#define NUM_THREADS 4
 
 // 都放静态存储区，节省内存
 float** A;
@@ -19,48 +17,39 @@ typedef struct {
 
 // 并行函数
 void* thread_func(void* arg) {
-    // 在循环外创建向量
-    float32x4_t vx = vmovq_n_f32(0);
-    float32x4_t vaij = vmovq_n_f32(0);
-    float32x4_t vaik = vmovq_n_f32(0);
-    float32x4_t vakj = vmovq_n_f32(0);
     // 传参
     ThreadArgs* thread_arg = (ThreadArgs*)arg;
     int id = thread_arg->id;
     int k = thread_arg->k;
 
-    // 消去第[k+1, n)行的第k列元素，同样，分块处理
-    // 第k行不能合在一起考虑了，第k列还可以
-    int start = k+1 + id * ((n-k-1) / NUM_THREADS);
-    int end = k+1 + (id+1) * ((n-k-1) / NUM_THREADS);
-    if (id + 1 == NUM_THREADS) {
-        end = n;
+    // 一个线程负责一行
+    int i = k + id + 1;
+    // 创建向量
+    __m128 vx, vaij, vaik, vakj;
+    // 对第i行的元素计算进行并行化处理
+    // A[i][j]、A[k][j]开始连续四个元素分别形成寄存器
+    // A[i][k]为固定值，复制4份存在另一个寄存器里
+    vaik = _mm_load1_ps(&A[i][k]);
+    int j;
+    for (j=k+1; j+4<=n; j+=4) {
+        // 原始公式：A[i][j] = A[i][j] - A[k][j]*A[i][k];
+        vakj = _mm_loadu_ps(&A[k][j]);
+        vaij = _mm_loadu_ps(&A[i][j]);
+        vx = _mm_mul_ps(vakj, vaik);
+        vaij = _mm_sub_ps(vaij, vx);
+        _mm_storeu_ps(&A[i][j], vaij);
     }
-    for (int i=start; i<end; i++) {
-        vaik = vmovq_n_f32(&(A[i][k]);
-        int j;
-        // j: k ~ n-1，向量化
-        for (j=k; j<n; j+=4) {
-            // A[i][j] -= A[i][k] * A[k][j];
-            vakj = vld1q_f32(&A[k][j]);
-            vaij = vld1q_f32(&A[i][j]);
-            vx = vmulq_f32(vakj, vaik);
-            vaij = vsubq_f32(vaij, vx);
-            vst1q_f32(&A[i][j], vaij);
-        }
-        // 不能整除的部分
-        for (; j<n; j++) {
-            A[i][j] -= A[i][k] * A[k][j];
-        }
+
+    // 剩下的元素
+    for (; j<n; j++) {
+        A[i][j] = A[i][j] - A[k][j]*A[i][k];
     }
+    A[i][k] = 0;
     pthread_exit(NULL);
 }
 
 // Pthread动态线程
 void LU() {
-    pthread_t threads[NUM_THREADS];
-    ThreadArgs thread_ids[NUM_THREADS];
-
     for (int k=0; k<n; k++) {
         // 串行除法
         for (int i=k; i<n; i++) {
@@ -68,13 +57,18 @@ void LU() {
         }
         // 多线程并行减法，此方法缺点：频繁创建线程，开销大
         // 初始化线程的id
-        for (int i=0; i<NUM_THREADS; i++) {
+        int worker_count = n - 1 - k;
+        pthread_t* threads = new pthread_t[n - 1 - k];
+        ThreadArgs* thread_ids = new ThreadArgs[n - 1 - k];
+        for (int i=0; i<n-1-k; i++) {
             thread_ids[i] = {i, k};
         }
-        for (int i=0; i<NUM_THREADS; i++) {
+        // 创建线程
+        for (int i=0; i<n-1-k; i++) {
             pthread_create(&threads[i], NULL, thread_func, &thread_ids[i]);
         }
-        for (int i=0; i<NUM_THREADS; i++) {
+        // 等待线程计算完毕
+        for (int i=0; i<n-1-k; i++) {
             pthread_join(threads[i], NULL);
         }
     }

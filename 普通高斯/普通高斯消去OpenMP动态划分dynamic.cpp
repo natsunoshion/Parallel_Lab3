@@ -33,8 +33,8 @@ void LU() {
 
         // 使用OpenMP并行化行消去
         // 使用OpemMP 4.0的SIMD方法进行自动向量化、循环展开
-        #pragma omp for simd
-        // #pragma omp for
+        // 动态划分循环
+        #pragma omp for simd schedule(dynamic, 1)
         for (i=k+1; i<n; i++) {
             tmp = A[i][k];
             for (j=k; j<n; j++) {
