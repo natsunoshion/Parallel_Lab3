@@ -1,5 +1,5 @@
 /*
-使用char数组实现位图
+使用int整数数组实现位图
 5个bit组成一个int
 基本就只能分析代码调试，非常阴间
 */
@@ -9,12 +9,9 @@
 using namespace std;
 
 // 对应于数据集三个参数：矩阵列数，非零消元子行数，被消元行行数
-#define num_columns 1011
-#define num_elimination_rows 539
-#define num_eliminated_rows 263
-
-// 线程数
-#define NUM_THREADS 4
+#define num_columns 23045
+#define num_elimination_rows 18748
+#define num_eliminated_rows 14325
 
 // 数组长度
 const int length = ceil(num_columns / 5.0);
@@ -23,9 +20,6 @@ const int length = ceil(num_columns / 5.0);
 char R[10000][length];  // R[i]记录了首项为i（下标从0开始记录）的消元子行
                         // 所以不能直接用num_elimination_rows设置数组大小
 char E[num_eliminated_rows][length];
-
-// 记录 <消元行操作的行号，首项所在的列号>
-vector<pair<int, int>> records;
 
 // 记录是否升格
 bool lifted[num_eliminated_rows];
@@ -54,50 +48,46 @@ void solve() {
     // 每一次遍历消元子、被消元行的5个bit，通过数组的一个元素来实现
     // E[i][x]对应了5x ~ 5(x+1)-1这5个bit，从右向左存储bit
     // 这样存储的好处：不用考虑边界
-    // OpenMP多线程并行化，循环外创建
-    #pragma omp parallel num_threads(NUM_THREADS), shared(records), private(n)  // 这个private(n)很重要
     for (n = length - 1; n >= 0; n--) {
-        #pragma omp single
-        {
-            records.clear();
-            // 遍历被消元行
-            for (int i=0; i<num_eliminated_rows; i++) {
-                // 不处理升格的那些行
-                if (lifted[i]) {
-                    continue;
-                }
-                // 找首项消去，必须从高到低找
-                for (int j = 5*(n+1)-1; j >= 5*n; j--) {
-                    if (E[i][n] >> (j-5*n) == 1) {
-                        if (R[j][n] != 0) {
-                            E[i][n] ^= R[j][n];
-                            records.emplace_back(i, j);
-                        } else {
-                            // 立刻升格，方便之后其他行消去
-                            for (auto pair : records) {
-                                int row = pair.first;
-                                int leader = pair.second;
-                                if (row == i) {
-                                    // 补上剩下位的异或
-                                    for (int k=n-1; k>=0; k--) {
-                                        E[i][k] ^= R[leader][k];
-                                    }
+        // 遍历被消元行
+        vector<pair<int, int>> records;  // 记录 <消元行操作的行号，首项所在的列号>
+        for (int i=0; i<num_eliminated_rows; i++) {
+            // 不处理升格的那些行
+            if (lifted[i]) {
+                continue;
+            }
+            // 找首项消去，必须从高到低找
+            for (int j = 5*(n+1)-1; j >= 5*n; j--) {
+                if (E[i][n] >> (j-5*n) == 1) {\
+                    if (R[j][n] != 0) {
+                        E[i][n] ^= R[j][n];
+                        records.emplace_back(i, j);
+                    } else {
+                        // 立刻升格，方便之后其他行消去
+                        for (auto pair : records) {
+                            int row = pair.first;
+                            int leader = pair.second;
+                            if (row == i) {
+                                // 补上剩下位的异或
+                                for (int k=n-1; k>=0; k--) {
+                                    E[i][k] ^= R[leader][k];
                                 }
                             }
-                            // 消元子第j行 = 被消元行第i行
-                            for (int k=0; k<length; k++) {
-                                R[j][k] = E[i][k];
-                            }
-                            lifted[i] = true;
-                            break;
                         }
+                        // 消元子第j行 = 被消元行第i行
+                        for (int k=0; k<length; k++) {
+                            R[j][k] = E[i][k];
+                        }
+                        lifted[i] = true;
+                        break;
                     }
                 }
             }
         }
-        // 接下来，对剩下的列进行并行计算，按照records中的记录进行多线程操作
+        // 接下来，对剩下的列进行并行计算，按照records中的记录进行多线程操作（由于刚刚没有存回去，所以这里剩下有n列）
         // 这些数组元素就按照记录挨个异或，由于已经有记录了（无依赖），所以可以并行化
-        #pragma omp for simd schedule(guided, 1)
+        // OpenMP多线程并行化
+        #pragma omp parallel for simd schedule(guided, 1)
         for (int m=n-1; m>=0; m--) {
             for (auto pair : records) {
                 int row = pair.first;

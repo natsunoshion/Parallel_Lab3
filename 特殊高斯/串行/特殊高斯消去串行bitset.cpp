@@ -112,6 +112,6 @@ int main() {
     cout << diff.count() << "ms" << endl;
 //--------------------------------
     // 验证结果正确性
-    print();
+    // print();
     return 0;
 }

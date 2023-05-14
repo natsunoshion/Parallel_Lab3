@@ -10,9 +10,9 @@
 using namespace std;
 
 // 对应于数据集三个参数：矩阵列数，非零消元子行数，被消元行行数
-#define num_columns 254
-#define num_elimination_rows 106
-#define num_eliminated_rows 53
+#define num_columns 1011
+#define num_elimination_rows 539
+#define num_eliminated_rows 263
 
 // 线程数
 #define NUM_THREADS 4
@@ -63,11 +63,10 @@ void* thread_func(void* arg) {
     // 传参
     ThreadArgs* thread_arg = (ThreadArgs*)arg;
     int id = thread_arg->id;
-    int n;
     // 每一次遍历消元子、被消元行的5个bit，通过数组的一个元素来实现
     // E[i][x]对应了5x ~ 5(x+1)-1这5个bit，从右向左存储bit
     // 这样存储的好处：不用考虑边界
-    for (n = length - 1; n >= 0; n--) {
+    for (int n = length - 1; n >= 0; n--) {
         // 单线程记录
         if (id == 0) {
             records.clear();
@@ -104,6 +103,10 @@ void* thread_func(void* arg) {
                         }
                     }
                 }
+            }
+            // 计算完成,唤醒其他线程
+            for (int i=0; i<NUM_THREADS-1; i++) {
+                sem_post(&sem_division[i]);
             }
         } else {
             // 其余线程先等待

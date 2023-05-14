@@ -9,9 +9,9 @@
 using namespace std;
 
 // 对应于数据集三个参数：矩阵列数，非零消元子行数，被消元行行数
-#define num_columns 254
-#define num_elimination_rows 106
-#define num_eliminated_rows 53
+#define num_columns 1011
+#define num_elimination_rows 539
+#define num_eliminated_rows 263
 
 // 数组长度
 const int length = ceil(num_columns / 5.0);
@@ -135,6 +135,6 @@ int main() {
     cout << diff.count() << "ms" << endl;
 //--------------------------------
     // 验证结果正确性
-    print();
+    // print();
     return 0;
 }
